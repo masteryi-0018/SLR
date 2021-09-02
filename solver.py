@@ -168,10 +168,10 @@ def train(opt, epoch):
 
 
         # 打印
-        if batch_idx % sam == 0:
-            print("epoch:%d/%d, batch:%d/%d, loss:%.4f, acc:%.2f, wer:%.2f" %
-                  (epoch+1, opt.n_epochs, batch_idx+1, n_batchs,
-                   running_loss/(batch_idx+1), score*100, sum(wers)/len(wers)), flush = True)
+        # if batch_idx % sam == 0:
+            # print("epoch:%d/%d, batch:%d/%d, loss:%.4f, acc:%.2f, wer:%.2f" %
+                  # (epoch+1, opt.n_epochs, batch_idx+1, n_batchs,
+                  #  running_loss/(batch_idx+1), score*100, sum(wers)/len(wers)), flush = True)
 
 
     # 对于epoch
@@ -322,12 +322,12 @@ def test(opt, epoch):
             all_wer.extend(wers)
 
             # 打印
-            if idx % (sam/4) == 0:
-                print("epoch:%d/%d, batch:%d/%d, loss:%.4f, acc:%.2f, wer:%.2f" %
-                      (epoch+1, opt.n_epochs, idx+1, n_iters,
-                       running_loss/(i+1), score*100, sum(wers)/len(wers)), flush = True)
+            # if idx % (sam/4) == 0:
+                # print("epoch:%d/%d, batch:%d/%d, loss:%.4f, acc:%.2f, wer:%.2f" %
+                      # (epoch+1, opt.n_epochs, idx+1, n_iters,
+                      #  running_loss/(i+1), score*100, sum(wers)/len(wers)), flush = True)
 
-                '''超算'''
+            '''超算'''
 
 
 

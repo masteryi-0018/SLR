@@ -37,7 +37,6 @@ class Encoder(nn.Module):
             resnet = models.resnet152(pretrained=True)
 
         '''使用3d resnet'''
-        # self.c23d = C23D_blocks()
         # self.res3d = generate_model(34)
 
         # delete the last fc layer
@@ -55,7 +54,7 @@ class Encoder(nn.Module):
             )
 
         # attn encoder
-        self.attn = LSTMAttentionBlock(hidden_size=512)
+        # self.attn = LSTMAttentionBlock(hidden_size=512)
 
     def forward(self, x):
 
@@ -113,7 +112,7 @@ class Encoder(nn.Module):
         # torch.Size([32, 12, 512]) torch.Size([32, 512]) torch.Size([32, 512])
 
         # 加入encoder的注意力
-        out = self.attn(out)
+        # out = self.attn(out)
 
         return out, (h_n.squeeze(0), c_n.squeeze(0))
 
@@ -594,6 +593,5 @@ if __name__ == '__main__':
     seq2seq = Seq2Seq(len_dict=507)
     out = seq2seq(imgs, target)
     print("最终输出形状：", out.shape)
-
 
 
