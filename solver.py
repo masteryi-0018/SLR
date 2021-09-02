@@ -99,7 +99,7 @@ def train(opt, epoch):
     all_pred = []
     all_wer = []
 
-    print('--Started Training--', flush = True)
+    print('--Started Training And Testing--', flush = True)
     for batch_idx, data in enumerate(trainloader):
         imgs, target = data[0], data[1]
         imgs = imgs.to(device)
@@ -187,7 +187,7 @@ def train(opt, epoch):
     training_wer = sum(all_wer)/len(all_wer)
 
     # 训练结束
-    print('--Finished Training--', flush = True)
+    # print('--Finished Training--', flush = True)
     print("epoch:%d, loss:%.4f, acc:%.2f, wer:%.2f" %
           (epoch+1, training_loss, training_acc*100, training_wer), flush = True)
 
@@ -201,7 +201,7 @@ def train(opt, epoch):
         torch.save(model.cpu().state_dict(), pth_path)
     '''
     torch.save(model.state_dict(), pth_path)
-    print('--Model Saved--\n', flush = True)
+    # print('--Model Saved--\n', flush = True)
 
     return training_loss, training_acc, training_wer
 
@@ -266,7 +266,7 @@ def test(opt, epoch):
     all_pred = []
     all_wer = []
 
-    print('--Started Testing--', flush = True)
+    # print('--Started Testing--', flush = True)
 
     # 验证阶段不更新模型参数，同样放在gpu
     with torch.no_grad():
@@ -350,7 +350,7 @@ def test(opt, epoch):
         testing_wer = sum(all_wer)/len(all_wer)
 
 
-    print('--Finished Testing--', flush = True)
+    # print('--Finished Testing--', flush = True)
     print("epoch:%d, loss:%.4f, acc:%.2f, wer:%.2f\n" %
           (epoch+1, testing_loss, testing_acc*100, testing_wer), flush = True)
 
