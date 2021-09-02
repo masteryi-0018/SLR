@@ -29,7 +29,6 @@ def train(opt, epoch):
 
     batch_size = opt.batch_size
     img_size = opt.img_size
-    sam = opt.sample
     lr = opt.lr
     b1 = opt.b1
     b2 = opt.b2
@@ -218,7 +217,6 @@ def test(opt, epoch):
 
     batch_size = opt.batch_size
     img_size = opt.img_size
-    sam = opt.sample
 
     # 数据
     transform = transforms.Compose([transforms.CenterCrop([512, 512]),
