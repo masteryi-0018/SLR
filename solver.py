@@ -107,7 +107,7 @@ def train(opt, epoch):
         optimizer.zero_grad()
 
         # forward
-        outputs = model(imgs, target, 0.2)
+        outputs = model(imgs, target, 0.5)
         # 换回来
         outputs = outputs.permute(1,0,2)
 

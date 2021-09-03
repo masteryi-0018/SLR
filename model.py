@@ -28,13 +28,13 @@ class Encoder(nn.Module):
         if arch == "resnet18":
             resnet = models.resnet18(pretrained=False)
         elif arch == "resnet34":
-            resnet = models.resnet34(pretrained=True)
+            resnet = models.resnet34(pretrained=False)
         elif arch == "resnet50":
-            resnet = models.resnet50(pretrained=True)
+            resnet = models.resnet50(pretrained=False)
         elif arch == "resnet101":
-            resnet = models.resnet101(pretrained=True)
+            resnet = models.resnet101(pretrained=False)
         elif arch == "resnet152":
-            resnet = models.resnet152(pretrained=True)
+            resnet = models.resnet152(pretrained=False)
 
         '''使用3d resnet'''
         # self.res3d = generate_model(34)
@@ -71,7 +71,7 @@ class Encoder(nn.Module):
             out = out.view(out.size(0), -1)
             # print(out.shape) torch.Size([16, 512])
             cnn_embed_seq.append(out)
-            # 一共增加了t个sqe，也就是lstm中的一个标签对应的词向量长度
+            # 一共增加了t个seq，也就是lstm中的一个标签对应的词向量长度
 
         cnn_embed_seq = torch.stack(cnn_embed_seq, dim=0)
         # print(cnn_embed_seq.shape) torch.Size([12, 32, 512])
@@ -113,6 +113,8 @@ class Encoder(nn.Module):
 
         # 加入encoder的注意力
         # out = self.attn(out)
+        # 加入注意力 torch.Size([32, 512])
+        # 未加入注意力 torch.Size([32, 12, 512])
 
         return out, (h_n.squeeze(0), c_n.squeeze(0))
 
@@ -239,8 +241,9 @@ class Seq2Seq(nn.Module):
         # 对帧数求平均，每个样本都是看作一个完整句子 16, 12, 512 -> 16, 512
         # (上下文向量)context vector 来源是隐含状态h
         # 因为它编码了整个文本序列。这个上下文向量被用作解码器的初始隐藏状态。
-        # context = encoder_outputs.mean(dim=1)
-        context = encoder_outputs
+        context = encoder_outputs.mean(dim=1)
+        # 添加注意力后需要修改为以下表达
+        # context = encoder_outputs
 
         # first input to the decoder is the <sos> tokens
         in_put = target[:,0]
@@ -593,5 +596,4 @@ if __name__ == '__main__':
     seq2seq = Seq2Seq(len_dict=507)
     out = seq2seq(imgs, target)
     print("最终输出形状：", out.shape)
-
 
