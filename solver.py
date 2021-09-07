@@ -28,13 +28,14 @@ def train(opt, epoch):
     corpus_path = opt.corpus_path
 
     batch_size = opt.batch_size
+    crop_size = opt.crop_size
     img_size = opt.img_size
     lr = opt.lr
     b1 = opt.b1
     b2 = opt.b2
 
     # 数据集和变换
-    transform = transforms.Compose([transforms.CenterCrop([512, 512]),
+    transform = transforms.Compose([transforms.CenterCrop([crop_size, crop_size]),
                                     transforms.Resize([img_size, img_size]),
                                     transforms.ToTensor()])
 
@@ -118,7 +119,7 @@ def train(opt, epoch):
         # outputs torch.Size([32, 9, 507]) 507为每个词在字典中的概率
 
         outputs = outputs[1:].reshape(-1, output_dim)
-        # 112, 500
+        # 112, 500, 7*16=112
         target = target.permute(1,0)[1:].reshape(-1)
         # target也去掉sos，交换维度就是为了方便去掉sos
         # 变成112大小，正好符合交叉熵，这里是看500个词语里面预测正确多少
@@ -187,7 +188,7 @@ def train(opt, epoch):
 
     # 训练结束
     # print('--Finished Training--', flush = True)
-    print("epoch:%d, loss:%.4f, acc:%.2f, wer:%.2f" %
+    print("epoch:%d, loss:%.2f, acc:%.2f, wer:%.2f" %
           (epoch+1, training_loss, training_acc*100, training_wer), flush = True)
 
     os.makedirs(opt.out_path, exist_ok=True)
@@ -216,10 +217,11 @@ def test(opt, epoch):
     corpus_path = opt.corpus_path
 
     batch_size = opt.batch_size
+    crop_size = opt.crop_size
     img_size = opt.img_size
 
     # 数据
-    transform = transforms.Compose([transforms.CenterCrop([512, 512]),
+    transform = transforms.Compose([transforms.CenterCrop([crop_size, crop_size]),
                                     transforms.Resize([img_size, img_size]),
                                     transforms.ToTensor()])
 
@@ -349,7 +351,7 @@ def test(opt, epoch):
 
 
     # print('--Finished Testing--', flush = True)
-    print("epoch:%d, loss:%.4f, acc:%.2f, wer:%.2f\n" %
+    print("epoch:%d, loss:%.2f, acc:%.2f, wer:%.2f\n" %
           (epoch+1, testing_loss, testing_acc*100, testing_wer), flush = True)
 
     return testing_loss, testing_acc, testing_wer
@@ -378,6 +380,5 @@ def wer(r, h):
                 deletion = d[i-1][j] + 1
                 d[i][j] = min(substitution, insertion, deletion)
 
+
     return float(d[len(r)][len(h)]) / len(r) * 100
-
-

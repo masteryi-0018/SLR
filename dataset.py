@@ -231,7 +231,6 @@ if __name__ == '__main__':
                               corpus_path=corpus_path,
                               train=True, transform=transform)
 
+
     for i in range(len(trainset)):
         print(trainset[i][0].shape, trainset[i][1], trainset[i][2], trainset[i][3])
-
-

@@ -22,6 +22,7 @@ def parse_args():
     parser.add_argument("--batch_size", type=int, default=128)
 
     # 数据集参数
+    parser.add_argument("--crop_size", type=int, default=672)
     parser.add_argument("--img_size", type=int, default=224)
 
     # Adma参数
@@ -55,15 +56,14 @@ def epoch_out(opt):
 
     for e in range(opt.n_epochs):
         train_loss, train_acc, train_wer = solver.train(opt, e)
-        train_losses.append(train_loss)
-        train_acces.append(train_acc)
-        train_wers.append(train_wer)
-
+        train_losses.append(round(train_loss, 4))
+        train_acces.append(round(train_acc, 4))
+        train_wers.append(round(train_wer, 4))
 
         test_loss, test_acc, test_wer = solver.test(opt, e)
-        test_losses.append(test_loss)
-        test_acces.append(test_acc)
-        test_wers.append(test_wer)
+        test_losses.append(round(test_loss, 4))
+        test_acces.append(round(test_acc, 4))
+        test_wers.append(round(test_wer, 4))
 
     '''超算'''
     print("train_losses: ", train_losses, flush = True)
@@ -120,10 +120,9 @@ if __name__ == '__main__':
     total = end - start
     hours = total//3600
     minutes = total//60 - hours*60
-    seconds = total - hours*3600 - minutes*60
+    seconds = (total - hours*3600 - minutes*60) // 1
 
-    print("总用时：{:.1f}小时{:.1f}分钟{:.1f}秒".format(hours, minutes, seconds), flush = True)
-
+    print("总用时：{:n}小时 {:n}分钟 {:n}秒".format(hours, minutes, seconds), flush = True)
 
     # 直接测试
     # solver.test(opt, 1)

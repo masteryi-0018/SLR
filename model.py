@@ -596,4 +596,3 @@ if __name__ == '__main__':
     seq2seq = Seq2Seq(len_dict=507)
     out = seq2seq(imgs, target)
     print("最终输出形状：", out.shape)
-
