@@ -66,12 +66,12 @@ def epoch_out(opt):
         test_wers.append(round(test_wer, 4))
 
     '''超算'''
-    print("train_losses: ", train_losses, flush = True)
-    print("test_losses: ", test_losses, flush = True)
-    print("train_acces: ", train_acces, flush = True)
-    print("test_acces: ", test_acces, flush = True)
-    print("train_wers: ", train_wers, flush = True)
-    print("test_wers: ", test_wers, flush = True)
+    print("train_losses =", train_losses, flush = True)
+    print("test_losses =", test_losses, flush = True)
+    print("train_acces =", train_acces, flush = True)
+    print("test_acces =", test_acces, flush = True)
+    print("train_wers =", train_wers, flush = True)
+    print("test_wers =", test_wers, flush = True)
 
     '''
     plt.plot(counter, train_losses, color='blue')

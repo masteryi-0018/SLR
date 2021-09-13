@@ -33,7 +33,7 @@ class CSL_Continuous(Dataset):
         self.signers = 50
         self.repetition = 5
         # 帧数在读取图像时用到
-        self.frames = 12
+        self.frames = 16
 
         # 根据任务不同划分训练集测试集的大小，0.8*50*5=200，训练集每个句子对应200个样本
         if self.train:

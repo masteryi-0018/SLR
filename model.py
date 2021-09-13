@@ -214,7 +214,7 @@ class Seq2Seq(nn.Module):
         self.decoder = Decoder(len_dict=len_dict)
 
 
-    def forward(self, imgs, target, teacher_forcing_ratio=0.5):
+    def forward(self, imgs, target, teacher_forcing_ratio=0.8):
 
         # imgs: (batch_size, channels, T, H, W)
         # target: (batch_size, len_label)
