@@ -19,7 +19,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     # epoch和batch
     parser.add_argument("--n_epochs", type=int, default=50)
-    parser.add_argument("--batch_size", type=int, default=128)
+    parser.add_argument("--batch_size", type=int, default=32)
 
     # 数据集参数
     parser.add_argument("--crop_size", type=int, default=672)

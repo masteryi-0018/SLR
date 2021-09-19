@@ -18,7 +18,7 @@ from functools import partial
 
 # encoder负责将输入序列压缩成指定长度的向量，这个向量就可以看成是这个序列的语义，这个过程称为编码
 class Encoder(nn.Module):
-    def __init__(self, lstm_hidden_size=512, arch="resnet18"):
+    def __init__(self, lstm_hidden_size=512, arch="resnet"):
         super(Encoder, self).__init__()
         self.lstm_hidden_size = lstm_hidden_size
 
@@ -35,18 +35,21 @@ class Encoder(nn.Module):
             resnet = models.resnet101(pretrained=False)
         elif arch == "resnet152":
             resnet = models.resnet152(pretrained=False)
+        else:
+            resnet = ResNet()
 
         '''使用3d resnet'''
         # self.res3d = generate_model(34)
-
         # delete the last fc layer
         # [:-1]表示选取1到-1，即倒数第一个（不含），fc本来是512-1000
-        modules = list(resnet.children())[:-1]
-        self.resnet = nn.Sequential(*modules)
+        # modules = list(resnet.children())[:-1]
+        # self.resnet = nn.Sequential(*modules)
+        self.resnet = resnet
 
         # 最后一层换成lstm
         self.lstm = nn.LSTM(
-            input_size=resnet.fc.in_features, # 512
+            # input_size=resnet.fc.in_features, # 512
+            input_size=512,
             hidden_size=self.lstm_hidden_size, # 512
             # 如果是True，则input为(batch, seq, input_size)，默认值为：False(seq_len, batch, input_size)
             # num_layers：堆叠LSTM的层数，默认值为1
@@ -54,16 +57,16 @@ class Encoder(nn.Module):
             )
 
         # attn encoder
-        # self.attn = LSTMAttentionBlock(hidden_size=512)
+        # 时间注意力
+        self.attn = LSTMAttentionBlock(hidden_size=512)
 
     def forward(self, x):
-
         # CNN
         cnn_embed_seq = []
         # x: (batch_size, channel, t, h, w)
         # 对每一张图片进行
         for t in range(x.size(2)):
-            # with torch.no_grad():
+            # with torch.no_grad()
             out = self.resnet(x[:, :, t, :, :])
             # 4维
             # print(out.shape) torch.Size([16, 512, 1, 1])
@@ -74,6 +77,7 @@ class Encoder(nn.Module):
             # 一共增加了t个seq，也就是lstm中的一个标签对应的词向量长度
 
         cnn_embed_seq = torch.stack(cnn_embed_seq, dim=0)
+        # print('resnet输出：', cnn_embed_seq.shape)
         # print(cnn_embed_seq.shape) torch.Size([12, 32, 512])
         # batch first
         cnn_embed_seq = cnn_embed_seq.transpose_(0, 1)
@@ -112,7 +116,7 @@ class Encoder(nn.Module):
         # torch.Size([32, 12, 512]) torch.Size([32, 512]) torch.Size([32, 512])
 
         # 加入encoder的注意力
-        # out = self.attn(out)
+        out = self.attn(out)
         # 加入注意力 torch.Size([32, 512])
         # 未加入注意力 torch.Size([32, 12, 512])
 
@@ -214,7 +218,7 @@ class Seq2Seq(nn.Module):
         self.decoder = Decoder(len_dict=len_dict)
 
 
-    def forward(self, imgs, target, teacher_forcing_ratio=0.8):
+    def forward(self, imgs, target, teacher_forcing_ratio=0.5):
 
         # imgs: (batch_size, channels, T, H, W)
         # target: (batch_size, len_label)
@@ -241,9 +245,9 @@ class Seq2Seq(nn.Module):
         # 对帧数求平均，每个样本都是看作一个完整句子 16, 12, 512 -> 16, 512
         # (上下文向量)context vector 来源是隐含状态h
         # 因为它编码了整个文本序列。这个上下文向量被用作解码器的初始隐藏状态。
-        context = encoder_outputs.mean(dim=1)
+        # context = encoder_outputs.mean(dim=1)
         # 添加注意力后需要修改为以下表达
-        # context = encoder_outputs
+        context = encoder_outputs
 
         # first input to the decoder is the <sos> tokens
         in_put = target[:,0]
@@ -286,259 +290,146 @@ class Seq2Seq(nn.Module):
 
 
 
-'''3d resnet'''
-def get_inplanes():
-    return [64, 128, 256, 512]
-    # 通道数
-
-
-def conv3x3x3(in_planes, out_planes, stride=1):
-    return nn.Conv3d(in_planes,
-                     out_planes,
-                     kernel_size=3,
-                     stride=stride,
-                     padding=1,
-                     bias=False)
-
-
-def conv1x1x1(in_planes, out_planes, stride=1):
-    return nn.Conv3d(in_planes,
-                     out_planes,
-                     kernel_size=1,
-                     stride=stride,
-                     bias=False)
-
-
-class BasicBlock(nn.Module):
-    expansion = 1
-
-    def __init__(self, in_planes, planes, stride=1, downsample=None):
+'''原始resnet2d'''
+class ResidualBlock(nn.Module):
+    """实现一个残差块"""
+    def __init__(self,inchannel,outchannel,stride = 1,shortcut = None):
         super().__init__()
+        self.left = nn.Sequential(
+            nn.Conv2d(inchannel,outchannel,3,stride,1,bias=False),
+            nn.BatchNorm2d(outchannel),
+            nn.ReLU(),
+            nn.Conv2d(outchannel,outchannel,3,1,1,bias=False), # 这个卷积操作是不会改变w h的
+            nn.BatchNorm2d(outchannel)
+            )
+        self.right = shortcut
 
-        self.conv1 = conv3x3x3(in_planes, planes, stride)
-        self.bn1 = nn.BatchNorm3d(planes)
-        self.relu = nn.ReLU(inplace=True)
-
-        self.conv2 = conv3x3x3(planes, planes)
-        self.bn2 = nn.BatchNorm3d(planes)
-        self.downsample = downsample
-        self.stride = stride
-
-    def forward(self, x):
-        residual = x
-
-        out = self.conv1(x)
-        out = self.bn1(out)
-        out = self.relu(out)
-
-        out = self.conv2(out)
-        out = self.bn2(out)
-
-        if self.downsample is not None:
-            residual = self.downsample(x)
-
-        out += residual
-        out = self.relu(out)
-
-        return out
-
-
-class Bottleneck(nn.Module):
-    expansion = 4
-
-    def __init__(self, in_planes, planes, stride=1, downsample=None):
-        super().__init__()
-
-        self.conv1 = conv1x1x1(in_planes, planes)
-        self.bn1 = nn.BatchNorm3d(planes)
-        self.conv2 = conv3x3x3(planes, planes, stride)
-        self.bn2 = nn.BatchNorm3d(planes)
-        self.conv3 = conv1x1x1(planes, planes * self.expansion)
-        self.bn3 = nn.BatchNorm3d(planes * self.expansion)
-        self.relu = nn.ReLU(inplace=True)
-        self.downsample = downsample
-        self.stride = stride
-
-    def forward(self, x):
-        residual = x
-
-        out = self.conv1(x)
-        out = self.bn1(out)
-        out = self.relu(out)
-
-        out = self.conv2(out)
-        out = self.bn2(out)
-        out = self.relu(out)
-
-        out = self.conv3(out)
-        out = self.bn3(out)
-
-        if self.downsample is not None:
-            residual = self.downsample(x)
-
-        out += residual
-        out = self.relu(out)
-
-        return out
+    def forward(self, input):
+        out = self.left(input)
+        residual = input if self.right is None else self.right(input)
+        out+=residual
+        return F.relu(out)
 
 
 class ResNet(nn.Module):
-
-    def __init__(self,
-                 block, # Basic block
-                 layers, # 1 1 1 1
-                 block_inplanes, # get_inplanes()
-                 n_input_channels=3,
-                 conv1_t_size=7,
-                 conv1_t_stride=1,
-                 no_max_pool=False,
-                 shortcut_type='B',
-                 widen_factor=1.0,
-                 n_classes=400):
+    """实现主reset"""
+    def __init__(self,num_class=1000):
         super().__init__()
+        '''这里的层的定义应当和forward中的一致！'''
+        # 前面几层普通卷积
+        self.pre = nn.Sequential(
+            nn.Conv2d(3,64,7,2,3,bias=False),
+            nn.BatchNorm2d(64),
+            nn.ReLU(),
+            nn.MaxPool2d(3,2,1)
+            )
 
-        block_inplanes = [int(x * widen_factor) for x in block_inplanes]
+        # 这是通道注意力的进入通道数
+        # self.inplanes = 64
+        # 空间注意力
+        self.sa = SpatialAttention()
+        # 通道注意力
+        self.ca = ChannelAttention(64)
 
-        self.in_planes = block_inplanes[0] # 64, 128, 256, 512
-        self.no_max_pool = no_max_pool
+        # 重复layer，每个layer都包含多个残差块 其中第一个残差会修改w和c，其他的残差块等量变换
+        # 经过第一个残差块后大小为 w-1/s +1 （每个残差块包括left和right，而left的k = 3 p = 1，right的shortcut k=1，p=0）
+        self.layer1 = self._make_layer(64,128,3) # s默认是1 ,所以经过layer1后只有channle变了
+        self.layer2 = self._make_layer(128,256,4,stride=2) # w-1/s +1
+        self.layer3 = self._make_layer(256,512,6,stride=2)
+        self.layer4 = self._make_layer(512,512,3,stride=2)
+        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
 
-        self.conv1 = nn.Conv3d(n_input_channels,
-                               self.in_planes,
-                               kernel_size=(conv1_t_size, 7, 7),
-                               stride=(conv1_t_stride, 2, 2),
-                               padding=(conv1_t_size // 2, 3, 3),
-                               bias=False)
-        self.bn1 = nn.BatchNorm3d(self.in_planes)
-        self.relu = nn.ReLU(inplace=True)
-        self.maxpool = nn.MaxPool3d(kernel_size=3, stride=(2,2,2), padding=1)
-        self.layer1 = self._make_layer(block,
-                                       block_inplanes[0],
-                                       layers[0],
-                                       shortcut_type)
-        self.layer2 = self._make_layer(block,
-                                       block_inplanes[1],
-                                       layers[1],
-                                       shortcut_type,
-                                       stride=1)
-        self.layer3 = self._make_layer(block,
-                                       block_inplanes[2],
-                                       layers[2],
-                                       shortcut_type,
-                                       stride=1)
-        self.layer4 = self._make_layer(block,
-                                       block_inplanes[3],
-                                       layers[3],
-                                       shortcut_type,
-                                       stride=1)
-        # 以上的stride决定了是否要downsample 以及conv3d的步长，我改为了1
+        # self.fc = nn.Linear(512,num_class)
 
-        self.avgpool = nn.AdaptiveAvgPool3d((12, 1, 1))
-        self.fc = nn.Linear(block_inplanes[3] * block.expansion, n_classes)
 
-        for m in self.modules():
-            if isinstance(m, nn.Conv3d):
-                nn.init.kaiming_normal_(m.weight,
-                                        mode='fan_out',
-                                        nonlinearity='relu')
-            elif isinstance(m, nn.BatchNorm3d):
-                nn.init.constant_(m.weight, 1)
-                nn.init.constant_(m.bias, 0)
+    def _make_layer(self,inchannel,outchannel,block_num,stride = 1):
 
-    def _downsample_basic_block(self, x, planes, stride):
-        out = F.avg_pool3d(x, kernel_size=1, stride=stride)
-        zero_pads = torch.zeros(out.size(0), planes - out.size(1), out.size(2),
-                                out.size(3), out.size(4))
-        if isinstance(out.data, torch.cuda.FloatTensor):
-            zero_pads = zero_pads.cuda()
-
-        out = torch.cat([out.data, zero_pads], dim=1)
-
-        return out
-
-    def _make_layer(self, block, planes, blocks, shortcut_type, stride=1):
-        downsample = None
-        if stride != 1 or self.in_planes != planes * block.expansion:
-            if shortcut_type == 'A':
-                downsample = partial(self._downsample_basic_block,
-                                     planes=planes * block.expansion,
-                                     stride=stride)
-            else:
-                downsample = nn.Sequential(
-                    conv1x1x1(self.in_planes, planes * block.expansion, stride),
-                    nn.BatchNorm3d(planes * block.expansion))
+        # 刚开始两个cahnnle可能不同，所以right通过shortcut把通道也变为outchannel
+        shortcut = nn.Sequential(
+            # 之所以这里的k = 1是因为，我们在ResidualBlock中的k =3,p=1所以最后得到的大小为(w+2-3/s +1)
+            # 即(w-1 /s +1)，而这里的w = (w +2p-f)/s +1 所以2p -f = -1 如果p = 0则f = 1
+            nn.Conv2d(inchannel,outchannel,1,stride,bias=False),
+            nn.BatchNorm2d(outchannel)
+            )
 
         layers = []
-        layers.append(
-            block(in_planes=self.in_planes, # 64, 128, 256, 512
-                  planes=planes,
-                  stride=stride,
-                  downsample=downsample))
-        self.in_planes = planes * block.expansion # 为1或者4
-        for i in range(1, blocks):
-            layers.append(block(self.in_planes, planes))
+        layers.append(ResidualBlock(inchannel,outchannel,stride,shortcut))
+
+        # 之后的cahnnle同并且 w h也同，而经过ResidualBloc其w h不变，
+        for i in range(1,block_num):
+            layers.append(ResidualBlock(outchannel,outchannel))
 
         return nn.Sequential(*layers)
 
+
     def forward(self, x):
-        x = self.conv1(x)
-        x = self.bn1(x)
-        x = self.relu(x)
-        # print("preconv", x.shape) torch.Size([2, 64, 12, 112, 112])
-        if not self.no_max_pool:
-            x = self.maxpool(x)
-        # print("conv", x.shape) torch.Size([2, 64, 12, 56, 56])
+        x = self.pre(x)
+
+        x = self.sa(x) * x
+        x = self.ca(x) * x
 
         x = self.layer1(x)
-        x = self.maxpool(x)
-        # print("1", x.shape) torch.Size([2, 64, 12, 28, 28])
-
         x = self.layer2(x)
-        x = self.maxpool(x)
-        # print("2", x.shape) torch.Size([2, 128, 12, 14, 14])
-
         x = self.layer3(x)
-        x = self.maxpool(x)
-        # print("3", x.shape) torch.Size([2, 256, 12, 7, 7])
-
         x = self.layer4(x)
-        x = self.maxpool(x)
-        # print("4", x.shape) torch.Size([2, 512, 12, 4, 4])
 
+        # x = F.avg_pool2d(x, 7)
+        # 如果图片大小为224 ，经过多个ResidualBlock到这里刚好为7，所以做一个池化，为1，
+        # 所以如果图片大小小于224，都可以传入的，因为经过7的池化，肯定为1，但是大于224则不一定
+        # x = x.view(x.size(0),-1)
         x = self.avgpool(x)
-        # print("avg", x.shape) torch.Size([2, 512, 12, 1, 1])
-
-        # x = x.view(x.size(0), -1)
+        x = x.reshape(x.size(0), -1)
         # x = self.fc(x)
-        # 这里不要fc，直接将(2,512,12)形状输出
-
-        x = torch.squeeze(x, dim=4)
-        x = torch.squeeze(x, dim=3)
 
         return x
 
-# 10 18 34层使用basicblock 50以上使用bottleneck
-def generate_model(model_depth, **kwargs):
-    assert model_depth in [10, 18, 34, 50, 101, 152, 200]
-
-    if model_depth == 10:
-        model = ResNet(BasicBlock, [1, 1, 1, 1], get_inplanes(), **kwargs)
-    elif model_depth == 18:
-        model = ResNet(BasicBlock, [2, 2, 2, 2], get_inplanes(), **kwargs)
-    elif model_depth == 34:
-        model = ResNet(BasicBlock, [3, 4, 6, 3], get_inplanes(), **kwargs)
-    elif model_depth == 50:
-        model = ResNet(Bottleneck, [3, 4, 6, 3], get_inplanes(), **kwargs)
-    elif model_depth == 101:
-        model = ResNet(Bottleneck, [3, 4, 23, 3], get_inplanes(), **kwargs)
-    elif model_depth == 152:
-        model = ResNet(Bottleneck, [3, 8, 36, 3], get_inplanes(), **kwargs)
-    elif model_depth == 200:
-        model = ResNet(Bottleneck, [3, 24, 36, 3], get_inplanes(), **kwargs)
-
-    return model
 
 
-'''注意力机制'''
+'''通道注意力'''
+class ChannelAttention(nn.Module):
+    def __init__(self, in_planes, ratio=16):
+        super(ChannelAttention, self).__init__()
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.max_pool = nn.AdaptiveMaxPool2d(1)
+
+        self.fc1   = nn.Conv2d(in_planes, in_planes // 16, 1, bias=False)
+        self.relu1 = nn.ReLU()
+        self.fc2   = nn.Conv2d(in_planes // 16, in_planes, 1, bias=False)
+
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        #print(x.shape)
+        avg_out = self.fc2(self.relu1(self.fc1(self.avg_pool(x))))
+        max_out = self.fc2(self.relu1(self.fc1(self.max_pool(x))))
+        #print(avg_out.shape, max_out.shape)
+        out = avg_out + max_out
+
+        return self.sigmoid(out)
+
+
+
+'''空间注意力'''
+class SpatialAttention(nn.Module):
+    def __init__(self, kernel_size=7):
+        super(SpatialAttention, self).__init__()
+        assert kernel_size in (3, 7), 'kernel size must be 3 or 7'
+        padding = 3 if kernel_size == 7 else 1
+
+        self.conv1 = nn.Conv2d(2, 1, kernel_size, padding=padding, bias=False)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        avg_out = torch.mean(x, dim=1, keepdim=True)
+        max_out, _ = torch.max(x, dim=1, keepdim=True)
+        x = torch.cat([avg_out, max_out], dim=1)
+        x = self.conv1(x)
+
+        return self.sigmoid(x)
+
+
+
+'''时间注意力'''
 class LSTMAttentionBlock(nn.Module):
     def __init__(self, hidden_size):
         super(LSTMAttentionBlock, self).__init__()
@@ -581,7 +472,6 @@ if __name__ == '__main__':
     out, hc = encoder(imgs)
     print(out.shape, hc[0].shape, hc[1].shape)
 
-
     # test decoder
     decoder = Decoder(len_dict=500)
     in_put = torch.LongTensor(16).random_(0, 500)
@@ -590,6 +480,12 @@ if __name__ == '__main__':
     context = torch.randn(16, 512)
     out, hc = decoder(in_put, hidden, cell, context)
     print(out.shape, hc[0].shape, hc[1].shape)
+
+    # test ca
+    ca = ResNet()
+    img = torch.randn(2,3,224,224)
+    out = ca(img)
+    print("原始resnet：", out.shape)
     '''
 
     # test seq2seq
