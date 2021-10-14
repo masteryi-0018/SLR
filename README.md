@@ -1,7 +1,5 @@
 # SLR
 
-the project has moved to gitee：https://gitee.com/masteryi-0018/SLR
-
 一、超参数实验：
 
 1. 不同网络深度的影响
