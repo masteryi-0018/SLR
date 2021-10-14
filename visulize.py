@@ -64,7 +64,7 @@ if __name__ == "__main__":
                                     transforms.Resize([224, 224]),
                                     transforms.ToTensor()])
 
-    trainset = CSL_Continuous(data_path=data_path,
+    trainset = dataset.CSL_Continuous(data_path=data_path,
                               dict_path=dict_path,
                               corpus_path=corpus_path,
                               train=True, transform=transform)
